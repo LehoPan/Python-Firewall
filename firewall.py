@@ -5,11 +5,13 @@ from collections import defaultdict
 from scapy.all import sniff, IP
 
 PACKET_LIMIT = 20
+HOST_IP = "192.168.2.3"
 print(f"PACKETLIMIT: {PACKET_LIMIT}")
 
 def packet_callback(packet):
     source_ip = packet[IP].src
-    packet_count[source_ip] += 1
+    if source_ip != HOST_IP:
+        packet_count[source_ip] += 1
     current_time = time.time()
     time_interval = current_time - start_time[0]
     if time_interval >= 1:

@@ -11,6 +11,6 @@ try:
             print(f"Ping to {targetIP} successful.")            #confirmation if ping is successful
         else:
             print(f"Ping to {targetIP} blocked/failed.")        #confirmation if ping failed or gets blocked
-        time.sleep(0.5)                 #time between each ping being sent out
+        time.sleep(0.01)                 #time between each ping being sent out
 except KeyboardInterrupt:               #control C to terminate attack
     print("\nPing attack stopped.")
