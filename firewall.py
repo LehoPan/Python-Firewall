@@ -5,7 +5,7 @@ from collections import defaultdict
 from scapy.all import sniff, IP
 
 PACKET_LIMIT = 20
-HOST_IP = "192.168.2.3"
+HOST_IP = "192.168.2.2"
 print(f"PACKETLIMIT: {PACKET_LIMIT}")
 
 def packet_callback(packet):
