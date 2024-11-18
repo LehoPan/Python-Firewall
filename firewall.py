@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
     # FLUSHES OUT ALL EXISTING INPUT RULES
     # this is to make sure things in whitelist aren't already blocked
-    if bool(config.get('settings', 'FLUSH_RULES')):
+    if config.getboolean('settings', 'FLUSH_RULES'):
         os.system("iptables -F INPUT")
         add_log("BFlushing previous ruleset")
 
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     blocked_ips = set()
 
     # checks if the option to block icmp echo requests (ping) is check and blocks it
-    if bool(config.get('settings', 'BLOCK_ICMP_ECHO_REQUESTS')):
+    if config.getboolean('settings', 'BLOCK_ICMP_ECHO_REQUESTS'):
         print("Blocking ICMP echo requests")
         os.system(f"iptables -A INPUT -p icmp --icmp-type echo-request -j DROP")
         add_log("Blocking ICMP echo requests")
