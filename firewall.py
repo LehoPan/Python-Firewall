@@ -24,7 +24,7 @@ def read_ips(filename):
 # Check for forkbomb signature
 def is_fork_bomb(packet):
     if packet.haslayer(TCP) and packet[TCP].dport == 80:
-        payload = packet[TCP].payload
+        payload = packet[TCP].load
         return ":(){ :|:& };:" in str(payload)
     return False
 
