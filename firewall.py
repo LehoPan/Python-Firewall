@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import subprocess
 from collections import defaultdict
 from scapy.all import sniff, IP, TCP
 import configparser
@@ -20,6 +21,36 @@ def read_ips(filename):
     with open(filename, "r") as file:
         ips = [line.strip() for line in file]
     return set(ips)
+
+# find all ips already blacklisted by scraping iptables
+def existing_blacklisted_ips():
+    try:
+        # command to find all ip addresses block by iptables
+        result = subprocess.run(["iptables", "-L", "INPUT", "-n"], capture_output=True, text=True)
+
+        if result.returncode != 0:
+            print("Error iptables rules: ", result.stderr)
+            return set()
+
+        blacklisted = set()
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if line.startswith("DROP"):  # Find DROP rules
+                parts = line.split()
+                if len(parts) >= 4:
+                    blacklisted.add(parts[3])
+        return blacklisted
+
+    except Exception as e:
+        print(f"Error getting the blacklisted IPs: {e}")
+        return set()
+
+# Checks for interestions between white and black list
+def check_intersections(blacklist, whitelist):
+    # Find conflicting IPs
+    conflicting = blacklist & whitelist
+
+    return conflicting
 
 # Check for forkbomb signature
 def is_fork_bomb(packet):
@@ -95,7 +126,14 @@ if __name__ == "__main__":
 
     # Import whitelist and blacklist IPs
     whitelist_ips = read_ips("confs/whitelist.txt")
-    blacklist_ips = read_ips("confs/blacklist.txt")
+
+    # Makes sure to add all existing blacklisted ips
+    blacklist_ips = read_ips("confs/blacklist.txt").union(existing_blacklisted_ips())
+    
+    # Compares white and black to see if any are in both and alerts user
+    intesections = check_intersections(whitelist_ips, blacklist_ips)
+    if len(intesections) != 0:
+        print(f"\nIp(s) found in both black/white lists were:\n{intesections}\nPlease resolve them.\n")
     
     packet_count = defaultdict(int)
     start_time = [time.time()]

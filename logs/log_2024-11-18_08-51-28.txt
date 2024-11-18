@@ -1,0 +1,2 @@
+BFlushing previous ruleset
+Blocking ICMP echo requests
