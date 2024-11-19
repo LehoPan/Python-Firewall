@@ -22,6 +22,12 @@ def read_ips(filename):
         ips = [line.strip() for line in file]
     return set(ips)
 
+# Reads in a text file of mac addresses and returns a set
+def read_macs(filename):
+    with open(filename, "r") as file:
+        macs = [line.strip() for line in file]
+    return set(macs)
+
 # find all ips already blacklisted by scraping iptables
 def existing_blacklisted_ips():
     try:
@@ -74,14 +80,19 @@ def add_log(message):
 # Callback function for everytime we recieve a packet
 def packet_callback(packet):
     source_ip = packet[IP].src
+    source_mac = packet.hwsrc #add way to grab source mac of packet
 
-    # doesn't do anything if the ip is on the white list
-    if source_ip in whitelist_ips or source_ip == HOST_IP:
+    # doesn't do anything if the ip or mac is on the white list
+    if (source_ip in whitelist_ips or source_ip == HOST_IP) and (source_mac in whitelist_macs): #potentially add mac related rules here
         return
     # checks if it is on blacklist and blocks
     elif source_ip in blacklist_ips:
         os.system(f"iptables -A INPUT -s {source_ip} -j DROP")
         add_log(f"Blocking blacklisted IP: {source_ip}")
+        return
+    elif source_mac not in whitelist_macs: #adds rule, drops packets based on mac address
+        os.system(f"arptables -A INPUT --source-mac {source_mac} -j DROP")
+        add_log(f"Blocking packets from: {source_mac}")
         return
     
     # does the check for the fork bomb signature
@@ -126,6 +137,9 @@ if __name__ == "__main__":
 
     # Import whitelist and blacklist IPs
     whitelist_ips = read_ips("confs/whitelist.txt")
+
+    # Import whitelisted MAC addresses
+    whitelist_macs = read_macs("confs/whitelistmac.txt")
 
     # Makes sure to add all existing blacklisted ips
     blacklist_ips = read_ips("confs/blacklist.txt").union(existing_blacklisted_ips())
