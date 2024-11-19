@@ -170,4 +170,4 @@ if __name__ == "__main__":
 
 
     print("Firewall Running!")
-    sniff(filter="ip", prn=packet_callback)
+    sniff(prn=packet_callback)
