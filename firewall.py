@@ -3,7 +3,7 @@ import sys
 import time
 import subprocess
 from collections import defaultdict
-from scapy.all import sniff, IP, TCP
+from scapy.all import sniff, IP, TCP, ARP
 import configparser
 
 # config parser in order to grab settings form the configuration file
@@ -21,6 +21,12 @@ def read_ips(filename):
     with open(filename, "r") as file:
         ips = [line.strip() for line in file]
     return set(ips)
+
+# Reads in a text file of mac addresses and returns a set
+def read_macs(filename):
+    with open(filename, "r") as file:
+        macs = [line.strip() for line in file]
+    return set(macs)
 
 # find all ips already blacklisted by scraping iptables
 def existing_blacklisted_ips():
@@ -73,45 +79,60 @@ def add_log(message):
 
 # Callback function for everytime we recieve a packet
 def packet_callback(packet):
-    source_ip = packet[IP].src
+    source_ip = 0
+    source_mac = 0
 
-    # doesn't do anything if the ip is on the white list
-    if source_ip in whitelist_ips or source_ip == HOST_IP:
-        return
-    # checks if it is on blacklist and blocks
-    elif source_ip in blacklist_ips:
-        os.system(f"iptables -A INPUT -s {source_ip} -j DROP")
-        add_log(f"Blocking blacklisted IP: {source_ip}")
-        return
+    if packet.haslayer(IP):
+        source_ip = packet[IP].src
+
+        # doesn't do anything if the ip or mac is on the white list
+        if (source_ip in whitelist_ips or source_ip == HOST_IP):
+            if packet.haslayer(ARP) and source_mac in whitelist_macs:
+                return
+            return
+        
+        # checks if it is on blacklist and blocks
+        elif source_ip in blacklist_ips:
+            os.system(f"iptables -A INPUT -s {source_ip} -j DROP")
+            add_log(f"Blocking blacklisted IP: {source_ip}")
+            return
+        
+        # does the check for the fork bomb signature
+        if is_fork_bomb(packet):
+            print(f"Fork bomb detected from IP: {source_ip}")
+            os.system(f"iptables -A INPUT -s {source_ip} -j DROP")
+            add_log(f"Blocking fork bomb IP: {source_ip}")
+            return
+        
+        # logs how many times this ip has sent something in the interval
+        packet_count[source_ip] += 1
+        current_time = time.time()
+        time_interval = current_time - start_time[0]
+
+        # runs once the time interval has elapsed, and starts blacklisting
+        if time_interval >= SCAN_FREQUENCY:
+            for ip, count in packet_count.items():
+                packet_rate = count / time_interval
+
+                # triggers if the packet rate is exceeded and blacklists
+                if packet_rate > PACKET_LIMIT and ip not in blocked_ips:
+                    print(f"Blocking IP: {ip}, packet rate: {packet_rate}")
+                    os.system(f"iptables -A INPUT -s {ip} -j DROP")
+                    add_log(f"Blocking IP: {source_ip}, large packet rate: {packet_rate}")
+                    blocked_ips.add(ip)
+
+            packet_count.clear()
+            start_time[0] = current_time
+
+    if packet.haslayer(ARP):
+        source_mac = packet[ARP].hwsrc
+
+        if packet.haslayer(ARP) and source_mac not in whitelist_macs: #adds rule, drops packets based on mac address
+            print(f"Blocking Blacklisted mac: {source_mac}")
+            os.system(f"iptables -A INPUT -m mac --mac-source {source_mac} -j DROP")
+            add_log(f"Blocking packets from: {source_mac}")
+            return
     
-    # does the check for the fork bomb signature
-    if is_fork_bomb(packet):
-        print(f"Fork bomb detected from IP: {source_ip}")
-        os.system(f"iptables -A INPUT -s {source_ip} -j DROP")
-        add_log(f"Blocking fork bomb IP: {source_ip}")
-        return
-
-    # logs how many times this ip has sent something in the interval
-    packet_count[source_ip] += 1
-    current_time = time.time()
-    time_interval = current_time - start_time[0]
-
-    # runs once the time interval has elapsed, and starts blacklisting
-    if time_interval >= SCAN_FREQUENCY:
-        for ip, count in packet_count.items():
-            packet_rate = count / time_interval
-
-            # triggers if the packet rate is exceeded and blacklists
-            if packet_rate > PACKET_LIMIT and ip not in blocked_ips:
-                print(f"Blocking IP: {ip}, packet rate: {packet_rate}")
-                os.system(f"iptables -A INPUT -s {ip} -j DROP")
-                add_log(f"Blocking IP: {source_ip}, large packet rate: {packet_rate}")
-                blocked_ips.add(ip)
-
-        packet_count.clear()
-        start_time[0] = current_time
-
-
 if __name__ == "__main__":
     # makes sure the program has the necessary elevation
     if os.geteuid() != 0:
@@ -126,6 +147,9 @@ if __name__ == "__main__":
 
     # Import whitelist and blacklist IPs
     whitelist_ips = read_ips("confs/whitelist.txt")
+
+    # Import whitelisted MAC addresses
+    whitelist_macs = read_macs("confs/whitelistmac.txt")
 
     # Makes sure to add all existing blacklisted ips
     blacklist_ips = read_ips("confs/blacklist.txt").union(existing_blacklisted_ips())
@@ -147,4 +171,4 @@ if __name__ == "__main__":
 
 
     print("Firewall Running!")
-    sniff(filter="ip", prn=packet_callback)
+    sniff(prn=packet_callback)

