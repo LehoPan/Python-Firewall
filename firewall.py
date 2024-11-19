@@ -3,7 +3,7 @@ import sys
 import time
 import subprocess
 from collections import defaultdict
-from scapy.all import sniff, IP, TCP
+from scapy.all import sniff, IP, TCP, ARP
 import configparser
 
 # config parser in order to grab settings form the configuration file
@@ -83,14 +83,16 @@ def packet_callback(packet):
     source_mac = packet.hwsrc #add way to grab source mac of packet
 
     # doesn't do anything if the ip or mac is on the white list
-    if (source_ip in whitelist_ips or source_ip == HOST_IP) and (source_mac in whitelist_macs): #potentially add mac related rules here
+    if (source_ip in whitelist_ips or source_ip == HOST_IP):
+        if packet.haslayer(ARP) and source_mac in whitelist_macs:
+            return
         return
     # checks if it is on blacklist and blocks
     elif source_ip in blacklist_ips:
         os.system(f"iptables -A INPUT -s {source_ip} -j DROP")
         add_log(f"Blocking blacklisted IP: {source_ip}")
         return
-    elif source_mac not in whitelist_macs: #adds rule, drops packets based on mac address
+    elif packet.haslayer(ARP) and source_mac not in whitelist_macs: #adds rule, drops packets based on mac address
         os.system(f"arptables -A INPUT --source-mac {source_mac} -j DROP")
         add_log(f"Blocking packets from: {source_mac}")
         return
