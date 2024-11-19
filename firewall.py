@@ -128,7 +128,7 @@ def packet_callback(packet):
         source_mac = packet[ARP].hwsrc
 
         if packet.haslayer(ARP) and source_mac not in whitelist_macs: #adds rule, drops packets based on mac address
-            os.system(f"arptables -A INPUT --source-mac {source_mac} -j DROP")
+            os.system(f"iptables -A INPUT -m mac --mac-source {source_mac} -j DROP")
             add_log(f"Blocking packets from: {source_mac}")
             return
     
