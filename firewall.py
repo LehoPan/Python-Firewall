@@ -124,12 +124,12 @@ def packet_callback(packet):
             packet_count.clear()
             start_time[0] = current_time
 
-    if packet.haslayer(ARP):
+    if packet.haslayer(ARP) and config.getboolean('settings', 'WHITELIST_MACS'):
         source_mac = packet[ARP].hwsrc
 
         if packet.haslayer(ARP) and source_mac not in whitelist_macs: #adds rule, drops packets based on mac address
             print(f"Blocking Blacklisted mac: {source_mac}")
-            os.system(f"iptables -A INPUT -m mac --mac-source {source_mac} -j DROP")
+            os.system(f"arptables -A INPUT --source-mac {source_mac} -j DROP")
             add_log(f"Blocking packets from: {source_mac}")
             return
     
@@ -143,7 +143,8 @@ if __name__ == "__main__":
     # this is to make sure things in whitelist aren't already blocked
     if config.getboolean('settings', 'FLUSH_RULES'):
         os.system("iptables -F INPUT")
-        add_log("BFlushing previous ruleset")
+        os.system("arptables -F INPUT")
+        add_log("Flushing previous ruleset")
 
     # Import whitelist and blacklist IPs
     whitelist_ips = read_ips("confs/whitelist.txt")
