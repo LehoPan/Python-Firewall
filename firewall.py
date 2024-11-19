@@ -80,7 +80,8 @@ def add_log(message):
 # Callback function for everytime we recieve a packet
 def packet_callback(packet):
     source_ip = packet[IP].src
-    source_mac = packet.hwsrc #add way to grab source mac of packet
+    if packet.haslayer(ARP):
+        source_mac = packet.hwsrc
 
     # doesn't do anything if the ip or mac is on the white list
     if (source_ip in whitelist_ips or source_ip == HOST_IP):
